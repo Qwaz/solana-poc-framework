@@ -353,6 +353,24 @@ impl LocalEnvironment {
     pub fn bank(&mut self) -> &mut Bank {
         &mut self.bank
     }
+
+    /// Advance the bank to the next blockhash.
+    pub fn advance_blockhash(&self) -> Hash {
+        let parent_distance = if self.bank.slot() == 0 {
+            1
+        } else {
+            self.bank.slot() - self.bank.parent_slot()
+        };
+
+        for _ in 0..parent_distance {
+            let last_blockhash = self.bank.last_blockhash();
+            while self.bank.last_blockhash() == last_blockhash {
+                self.bank.register_tick(&Hash::new_unique())
+            }
+        }
+
+        self.get_recent_blockhash()
+    }
 }
 
 impl Environment for LocalEnvironment {
@@ -740,11 +758,15 @@ impl LocalEnvironmentBuilder {
             false,
             None,
         );
-        LocalEnvironment {
+
+        let env = LocalEnvironment {
             bank,
             faucet: clone_keypair(&self.faucet),
             _tmpdir: tmpdir,
-        }
+        };
+
+        env.advance_blockhash();
+        env
     }
 }
 
